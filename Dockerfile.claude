@@ -1,0 +1,12 @@
+FROM node:20-slim
+
+# Install Claude Code CLI only
+RUN npm install -g @anthropic-ai/claude-code
+
+# Create non-root user for safety
+RUN useradd -m claude
+USER claude
+WORKDIR /workspace
+
+ENTRYPOINT ["claude"]
+
