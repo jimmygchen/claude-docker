@@ -5,7 +5,11 @@ This repository provides a minimal setup to run the Claude Code CLI inside a Doc
 1. Build the docker image with 
 
 ```
+# minimal setup
 docker build -t claude-cli -f Dockerfile.claude .
+
+# or include dev tooling for Lighthouse development
+docker build -t claude-cli -f Dockerfile.dev .
 ```
 
 2. Create a file at `~/.claude_env` with any environment variables or credentials to use with Claude.

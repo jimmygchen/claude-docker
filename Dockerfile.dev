@@ -1,0 +1,94 @@
+FROM rust:latest
+
+# Install system dependencies for Lighthouse development
+RUN apt-get update && apt-get install -y \
+    # Build tools
+    build-essential \
+    cmake \
+    make \
+    pkg-config \
+    # Compiler toolchain
+    gcc \
+    g++ \
+    llvm-dev \
+    libclang-dev \
+    clang \
+    # Version control
+    git \
+    # Utilities
+    curl \
+    wget \
+    # Python for scripts and EF tests
+    python3 \
+    python3-pip \
+    # Additional utilities
+    jq \
+    ca-certificates \
+    # SSL libraries
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20 for Claude Code CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Install Java 21 for Web3Signer compatibility (required since v24.12.0)
+RUN wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | apt-key add - && \
+    echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list && \
+    apt-get update && \
+    apt-get install -y temurin-21-jdk && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Foundry (includes anvil) - specific version used in CI
+RUN curl -L https://foundry.paradigm.xyz | bash
+ENV PATH="/root/.foundry/bin:${PATH}"
+RUN /root/.foundry/bin/foundryup --version nightly-ca67d15f4abd46394b324c50e21e66f306a1162d
+
+# Install essential Rust tools
+RUN cargo install --locked \
+    cargo-nextest \
+    cargo-audit \
+    cargo-sort \
+    cross \
+    cargo-udeps
+
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+# Set environment variables for optimal development
+ENV RUSTFLAGS="-C debuginfo=0"
+ENV CARGO_INCREMENTAL=0
+ENV CARGO_NET_RETRY=10
+ENV RUSTUP_MAX_RETRIES=10
+ENV TEST_FEATURES="portable"
+
+# Create non-root user for safety
+RUN useradd -m -s /bin/bash claude && \
+    usermod -aG sudo claude && \
+    echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Make Foundry available for claude user
+RUN cp -r /root/.foundry /home/claude/ && \
+    chown -R claude:claude /home/claude/.foundry
+
+# Set up workspace
+WORKDIR /workspace
+RUN chown claude:claude /workspace
+
+USER claude
+
+# Update PATH for claude user
+ENV PATH="/home/claude/.foundry/bin:${PATH}"
+
+# Verify installations
+RUN rustc --version && \
+    cargo --version && \
+    git --version && \
+    make --version && \
+    cmake --version && \
+    java --version && \
+    node --version && \
+    npm --version && \
+    anvil --version
+
+ENTRYPOINT ["claude"]
