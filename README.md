@@ -17,6 +17,7 @@ docker build -t claude-cli -f Dockerfile.claude .
 alias claude='docker run --rm -it \
   -v "$(pwd)":"/home/claude/$(basename "$PWD")" \
   -v "$HOME/.claude.json":/home/claude/.claude.json \
+  -v "$HOME/.claude":/home/claude/.claude \
   -w "/home/claude/$(basename "$PWD")" \
   --env-file $HOME/.claude_env \
   claude-cli'
