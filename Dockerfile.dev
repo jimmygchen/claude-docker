@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
     # Additional utilities
     jq \
     ca-certificates \
+    gnupg \
     # SSL libraries
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -33,19 +34,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs
 
 # Install Java 21 for Web3Signer compatibility (required since v24.12.0)
-RUN wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | apt-key add - && \
-    echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list && \
+RUN wget -qO- https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /usr/share/keyrings/adoptium.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list && \
     apt-get update && \
     apt-get install -y temurin-21-jdk && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Foundry (includes anvil) - specific version used in CI
-RUN curl -L https://foundry.paradigm.xyz | bash
-ENV PATH="/root/.foundry/bin:${PATH}"
-RUN /root/.foundry/bin/foundryup --version nightly-ca67d15f4abd46394b324c50e21e66f306a1162d
+# We'll install Foundry after switching to claude user
 
-# Install essential Rust tools
-RUN cargo install --locked \
+# Install cargo-binstall using precompiled binary (fastest method)
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+# Install essential Rust tools using binstall (much faster)
+RUN cargo binstall --no-confirm \
     cargo-nextest \
     cargo-audit \
     cargo-sort \
@@ -67,15 +68,15 @@ RUN useradd -m -s /bin/bash claude && \
     usermod -aG sudo claude && \
     echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Make Foundry available for claude user
-RUN cp -r /root/.foundry /home/claude/ && \
-    chown -R claude:claude /home/claude/.foundry
-
 # Set up workspace
 WORKDIR /workspace
 RUN chown claude:claude /workspace
 
 USER claude
+
+# Install Foundry as claude user (avoids permission issues)
+RUN curl -L https://foundry.paradigm.xyz | bash && \
+    /home/claude/.foundry/bin/foundryup --version nightly-ca67d15f4abd46394b324c50e21e66f306a1162d
 
 # Update PATH for claude user
 ENV PATH="/home/claude/.foundry/bin:${PATH}"
@@ -88,7 +89,6 @@ RUN rustc --version && \
     cmake --version && \
     java --version && \
     node --version && \
-    npm --version && \
-    anvil --version
+    npm --version
 
 ENTRYPOINT ["claude"]
