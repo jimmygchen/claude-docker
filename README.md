@@ -22,6 +22,8 @@ alias claude='docker run --rm -it \
   -v "$(pwd)":"/home/claude/$(basename "$PWD")" \
   -v "$HOME/.claude.json":/home/claude/.claude.json \
   -v "$HOME/.claude":/home/claude/.claude \
+  -v "$HOME/.config/gh":/home/claude/.config/gh:ro \
+  -v "$HOME/.gitconfig":/home/claude/.gitconfig:ro \
   -w "/home/claude/$(basename "$PWD")" \
   --env-file $HOME/.claude_env \
   claude-cli'
@@ -29,6 +31,8 @@ alias claude='docker run --rm -it \
 # Reload your shell
 source ~/.zshrc
 ````
+
+**Note**: The alias mounts `~/.config/gh` (read-only) so Claude can use your existing GitHub CLI credentials without needing to login again.
 
 4. Usage: from any directory, just run:
 
